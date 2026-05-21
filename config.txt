@@ -1,0 +1,39 @@
+# backend=forge または comfyui
+# api_url は1行目に書いても、次行の key=value でも可
+backend=forge
+http://127.0.0.1:7860
+
+# ComfyUI 用（backend=comfyui のとき）
+# workflow=workflows/txt2img_sample.json
+# node_positive=CLIP Text Encode Positive
+# node_negative=CLIP Text Encode Negative
+# node_ksampler=KSampler
+# node_empty_latent=Empty Latent Image
+
+# サンプル生成設定
+width=768
+height=1024
+steps=24
+cfg_scale=7
+sampler_name=Euler a
+batch_size=1
+
+# WD14のしきい値
+general_threshold=0.35
+character_threshold=0.85
+max_tags=80
+
+# Florence自然文キャプション（ON/OFF は Chrome取込ページの UI スイッチ）
+# 以下は固定プリセットです。通常は変更しないでください。
+florence_model=thwri/CogFlorence-2.2-Large
+florence_precision=bf16
+florence_attention=sdpa
+florence_task=<MORE_DETAILED_CAPTION>
+florence_max_new_tokens=1024
+florence_num_beams=5
+florence_do_sample=false
+
+# 追加プロンプト/ネガティブ
+prompt_prefix=masterpiece, best quality
+prompt_suffix=
+negative_prompt=lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, signature, watermark, username, blurry
