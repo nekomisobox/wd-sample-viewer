@@ -2,8 +2,9 @@
 
 **日本語** | [English](README.en.md)
 
-<img width="249" height="314" alt="image" src="https://github.com/user-attachments/assets/4d92e91c-3f74-48c7-82fc-fe9361f65e88" /><img width="950" height="420" alt="image" src="https://github.com/user-attachments/assets/109fd211-46e2-417f-8434-5d02cbde85a0" />
-
+| Chrome 拡張（右クリック） | ビューア（ジョブ一覧） |
+| :---: | :---: |
+| ![画像を右クリックして「WDタグ+サンプル生成」](docs/images/readme-context-menu.png) | ![タグ・翻訳・生成結果を一覧表示](docs/images/readme-viewer.png) |
 
 画像や動画（HTML5 `<video>` の表示中フレーム）から WD14 タグを抽出し、そのタグを元にサンプル画像を自動生成し、**WD Tag Sample Viewer**（bridge / ビューア）に蓄積・表示するツールです。
 

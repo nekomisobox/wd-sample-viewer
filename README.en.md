@@ -2,7 +2,9 @@
 
 [日本語](README.md) | **English**
 
-<img width="249" height="314" alt="image" src="https://github.com/user-attachments/assets/4d92e91c-3f74-48c7-82fc-fe9361f65e88" /><img width="950" height="420" alt="image" src="https://github.com/user-attachments/assets/109fd211-46e2-417f-8434-5d02cbde85a0" />
+| Chrome extension (context menu) | Viewer (job list) |
+| :---: | :---: |
+| ![Right-click: WD tags + sample generation](docs/images/readme-context-menu.png) | ![Tags, translation, and outputs](docs/images/readme-viewer.png) |
 
 Extract WD14 tags from images or video (the current frame of an HTML5 `<video>`), optionally generate sample images from those tags, and collect results in **WD Tag Sample Viewer** (bridge / viewer).
 
