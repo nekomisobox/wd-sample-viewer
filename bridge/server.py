@@ -867,6 +867,9 @@ APP_HTML = r"""<!doctype html>
       .header-left { align-items: center; display: flex; flex: 1; gap: 16px; min-width: 0; }
       h1 { font-size: 22px; margin: 0; white-space: nowrap; }
       .status { color: #9db3ca; flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .header-credit { color: #7a8fa3; flex-shrink: 0; font-size: 12px; white-space: nowrap; }
+      .header-credit a { color: #9db3ca; text-decoration: none; }
+      .header-credit a:hover { color: #c8e6ff; text-decoration: underline; }
       .header-actions { align-items: center; display: flex; flex-shrink: 0; gap: 16px; margin-left: auto; }
       .backend-status { align-items: center; cursor: default; display: flex; gap: 8px; font-size: 13px; user-select: none; }
       .backend-dot { border-radius: 50%; flex-shrink: 0; height: 8px; width: 8px; }
@@ -936,6 +939,7 @@ APP_HTML = r"""<!doctype html>
       <div class="header-left">
         <h1>WD Tag Sample Viewer</h1>
         <div id="status" class="status">起動中</div>
+        <p class="header-credit">Created by <a href="https://lit.link/nekomiso_" target="_blank" rel="noopener noreferrer">nekomisobox</a></p>
       </div>
       <div class="header-actions">
         <div class="switch-row">

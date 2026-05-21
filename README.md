@@ -27,6 +27,7 @@ WD14 によるタグ抽出、Danbooru 辞書等を用いた日本語翻訳、お
 
 - **WD14 Rating の生成プロンプトへの反映** — サンプル生成時のみ、Rating に応じてポジティブ先頭に1タグを自動付与（general→safe、sensitive→sensitive、questionable→nsfw、explicit→explicit）。ビューアのタグ一覧・翻訳には含めません。`Rating: questionable` 等の表示は従来どおり WD14 の判定結果です。
 - **生成プロンプト（結合後）の確認** — サンプル生成したジョブで、Forge / ComfyUI に送った結合済みポジティブをビューアから確認できます。既定は折りたたみ（「生成プロンプト（結合後）」を開く）。コピー可。
+- **クレジット表示** — ビューアヘッダーに Created by [nekomisobox](https://lit.link/nekomiso_) を表示。
 
 ### v1.0
 
