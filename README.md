@@ -1,8 +1,8 @@
 # WD Tag Sample Viewer
 
-友人配布用には `README.txt` を読んでください。
-
 画像から WD14 タグを抽出し、そのタグでサンプル画像を生成して Chrome 上に表示するツールです。
+
+初めて使う方は [README.txt](README.txt) にセットアップ手順があります。
 
 - **backend=forge**: Forge/ReForge の txt2img API
 - **backend=comfyui**: ComfyUI の txt2img ワークフロー（Preview Image 終端）
@@ -27,7 +27,7 @@ http://127.0.0.1:7860  # api_url（1行目でも可）
 
 ## ComfyUI ワークフロー
 
-`workflows/txt2img_sample.json` を同梱。Checkpoint 名などは友人側で編集。
+`workflows/txt2img_sample.json` を同梱。Checkpoint 名などは利用環境に合わせて編集してください。
 
 - txt2img のみ（Load Image / WD14 なし）
 - 終端は **Preview Image**（ComfyUI `output/` に永久保存しない）

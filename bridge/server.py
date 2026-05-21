@@ -732,7 +732,7 @@ APP_HTML = r"""<!doctype html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Chrome取込</title>
+    <title>WD Tag Sample Viewer</title>
     <style>
       :root { color-scheme: dark; }
       body { margin: 0; background: #15191f; color: #e8eef7; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -787,7 +787,7 @@ APP_HTML = r"""<!doctype html>
   </head>
   <body>
     <header>
-      <h1>Chrome取込</h1>
+      <h1>WD Tag Sample Viewer</h1>
       <div id="status" class="status">起動中</div>
       <div class="switch-row">
         <label for="generateSample">サンプル生成</label>
@@ -974,7 +974,7 @@ APP_HTML = r"""<!doctype html>
 
       function updateTitle(items) {
         const active = items.filter((item) => item.state === "queued" || item.state === "running").length;
-        document.title = active > 0 ? `(${active}) Chrome取込` : "Chrome取込";
+        document.title = active > 0 ? `(${active}) WD Tag Sample Viewer` : "WD Tag Sample Viewer";
       }
 
       function statusText(items) {
@@ -986,7 +986,7 @@ APP_HTML = r"""<!doctype html>
           if (queued) parts.push(`待機 ${queued}`);
           return parts.join(" / ");
         }
-        return "Chrome取込を更新しました";
+        return "一覧を更新しました";
       }
 
       function renderJob(job) {

@@ -1,5 +1,6 @@
 .venv/
 jobs/
+preferences.json
 __pycache__/
 *.pyc
 
