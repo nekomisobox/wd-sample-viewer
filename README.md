@@ -1,4 +1,7 @@
 # WD Tag Sample Viewer
+
+**日本語** | [English](README.en.md)
+
 <img width="249" height="314" alt="image" src="https://github.com/user-attachments/assets/4d92e91c-3f74-48c7-82fc-fe9361f65e88" /><img width="950" height="420" alt="image" src="https://github.com/user-attachments/assets/109fd211-46e2-417f-8434-5d02cbde85a0" />
 
 
