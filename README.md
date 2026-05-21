@@ -44,18 +44,16 @@ bridge_port=8777
 
 ### ComfyUI を使用する場合の注意点
 
+> [!CAUTION]
 > **ComfyUI 利用者へ（必読）**  
-> 同梱の `workflows/txt2img_sample.json` は**サンプル**です。**このままでは動きません。**  
-> 必ず次の **2 点** を自分の環境用に直してください。
+> 同梱の **workflows/txt2img_sample.json** はサンプルです。**このままでは動きません。** 次の **2 点** を必ず直してください。
 >
-> 1. **【必須】モデル（Checkpoint）指定** — `CheckpointLoaderSimple` の `ckpt_name` を、ComfyUI の `models/checkpoints/` にある**実ファイル名**に変更（例: `your_model.safetensors`）。初期値 `model.safetensors` のままは**失敗します**。  
+> 1. **【必須】モデル（Checkpoint）指定** — **CheckpointLoaderSimple** の **ckpt_name** を、ComfyUI の **models/checkpoints/** にある実ファイル名に変更（例: **your_model.safetensors**）。初期値 **model.safetensors** のままは失敗します。  
 > 2. **【必須】API 形式のワークフロー** — 自作 workflow は ComfyUI で **Save (API Format)** で保存した JSON のみ使用可。通常のワークフロー保存形式は**そのままでは動きません**。
 >
 > 上記を直さないと、接続できていてもプロンプト投入時にエラーになります。
 
-- `config.txt` で `backend=comfyui` と ComfyUI の URL（例: `http://127.0.0.1:8188`）を指定してください。
-- **【必須】モデル指定 — 編集しないと動きません。** `workflows/txt2img_sample.json` の `CheckpointLoaderSimple` → `ckpt_name` を**必ず**自分の `.safetensors` 名に変更してください。
-- **【必須】API 形式 — これ以外は動きません。** 自作 workflow は **Save (API Format)** の JSON のみ。同梱 `txt2img_sample.json` は API 形式済みですが、**モデル名の変更は必須**です。
+- **config.txt** で **backend=comfyui** と ComfyUI の URL（例: **http://127.0.0.1:8188**）を指定してください。
 - **seed（シード）:** 実行のたびに bridge が `KSampler` の seed を **ランダム値で上書き**します（ワークフロー JSON の seed 値は使われません）。解像度・steps・sampler 等は workflow JSON のままです。
 - `config.txt` の `workflow` / `node_*` の行は、同梱ワークフローをそのまま使う限りコメントのままで構いません（コード側のデフォルトと一致しています）。別 JSON を使う場合やノードの `_meta.title` が違う場合だけ、コメントを外して上書きしてください。
 - ワークフローは **txt2img のみ**（Load Image / WD14 ノードは不要）で構成してください。WD14 や Florence の処理は bridge 内で実行されます。
@@ -74,8 +72,6 @@ bridge はタグから組み立てた **ポジティブ** と `config.txt` の *
 | 解像度・steps・sampler・batch・モデル | **Forge の txt2img タブ** | **workflow JSON** |
 
 `prompt_prefix` / `prompt_suffix` はポジ組み立て用（タグの前後に付与。Quality タグは通常 `prompt_suffix`）。ビューアのタグ一覧には表示されません。
-
-旧 `config.txt` の `width` / `height` / `steps` 等は読み込まれません（残していても無視されます）。
 
 ## 翻訳
 

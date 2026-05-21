@@ -168,7 +168,7 @@ negative_prompt:
 
 サンプル生成の解像度・steps・sampler・モデル等:
 Forge/ReForge は txt2img タブの普段の設定。ComfyUI は workflow JSON。
-bridge はポジ・ネガ（と ComfyUI の seed のみ）を渡します。旧 width/steps 等の config 行は無視されます。
+bridge はポジ・ネガ（と ComfyUI の seed のみ）を渡します。
 
 
 注意

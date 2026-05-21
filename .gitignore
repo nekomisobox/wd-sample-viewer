@@ -1,6 +1,8 @@
 .venv/
 jobs/
+models/
 preferences.json
+*.tmp
 __pycache__/
 *.pyc
 
