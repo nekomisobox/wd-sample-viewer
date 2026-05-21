@@ -737,11 +737,25 @@ APP_HTML = r"""<!doctype html>
       :root { color-scheme: dark; }
       body { margin: 0; background: #15191f; color: #e8eef7; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       header { align-items: center; border-bottom: 1px solid #2b3440; display: flex; gap: 16px; padding: 10px 16px; }
-      h1 { font-size: 22px; margin: 0; }
-      .status { color: #9db3ca; font-size: 13px; }
+      .header-left { align-items: center; display: flex; flex: 1; gap: 16px; min-width: 0; }
+      h1 { font-size: 22px; margin: 0; white-space: nowrap; }
+      .status { color: #9db3ca; flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .header-actions { align-items: center; display: flex; flex-shrink: 0; gap: 16px; margin-left: auto; }
+      .backend-status { align-items: center; cursor: default; display: flex; gap: 8px; font-size: 13px; user-select: none; }
+      .backend-dot { border-radius: 50%; flex-shrink: 0; height: 8px; width: 8px; }
+      .backend-status.checking .backend-dot { animation: backend-pulse 1s ease-in-out infinite; background: #f8d27a; }
+      .backend-status.connected .backend-dot { background: #5ee8c7; }
+      .backend-status.disconnected .backend-dot { background: #ff9a9a; }
+      .backend-label { color: #9db3ca; }
+      .backend-state { font-weight: 600; }
+      .backend-status.checking .backend-state { color: #f8d27a; }
+      .backend-status.connected .backend-state { color: #5ee8c7; }
+      .backend-status.disconnected .backend-state { color: #ff9a9a; }
+      @keyframes backend-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
       button { background: #263140; border: 1px solid #3a4656; border-radius: 6px; color: #fff; cursor: pointer; font-size: 14px; padding: 8px 12px; }
+      button:disabled { cursor: wait; opacity: 0.65; }
       button:hover { background: #334155; }
-      .switch-row { align-items: center; display: flex; gap: 8px; margin-left: auto; }
+      .switch-row { align-items: center; display: flex; flex-shrink: 0; gap: 8px; }
       .switch-row label { color: #abc0d5; cursor: pointer; font-size: 13px; user-select: none; }
       .switch { appearance: none; background: #344252; border-radius: 999px; cursor: pointer; height: 22px; position: relative; transition: background 0.15s; width: 40px; }
       .switch::after { background: #fff; border-radius: 50%; content: ""; height: 16px; left: 3px; position: absolute; top: 3px; transition: transform 0.15s; width: 16px; }
@@ -787,17 +801,26 @@ APP_HTML = r"""<!doctype html>
   </head>
   <body>
     <header>
-      <h1>WD Tag Sample Viewer</h1>
-      <div id="status" class="status">起動中</div>
-      <div class="switch-row">
-        <label for="generateSample">サンプル生成</label>
-        <input id="generateSample" class="switch" type="checkbox" checked>
+      <div class="header-left">
+        <h1>WD Tag Sample Viewer</h1>
+        <div id="status" class="status">起動中</div>
       </div>
-      <div class="switch-row">
-        <label for="florenceEnabled" title="初回のみモデル読込で遅くなります">Florence自然文</label>
-        <input id="florenceEnabled" class="switch" type="checkbox">
+      <div class="header-actions">
+        <div class="switch-row">
+          <label for="generateSample">サンプル生成</label>
+          <input id="generateSample" class="switch" type="checkbox" checked>
+        </div>
+        <div class="switch-row">
+          <label for="florenceEnabled" title="初回のみモデル読込で遅くなります">Florence自然文</label>
+          <input id="florenceEnabled" class="switch" type="checkbox">
+        </div>
+        <div id="backendStatus" class="backend-status checking" title="">
+          <span class="backend-dot" aria-hidden="true"></span>
+          <span class="backend-label">Backend</span>
+          <span class="backend-state">接続中</span>
+        </div>
+        <button id="refresh" type="button">更新</button>
       </div>
-      <button id="refresh" type="button">Refresh</button>
     </header>
     <main>
       <section id="drop" class="drop">
@@ -817,6 +840,9 @@ APP_HTML = r"""<!doctype html>
     <script>
       const jobsEl = document.getElementById("jobs");
       const statusEl = document.getElementById("status");
+      const backendStatusEl = document.getElementById("backendStatus");
+      const backendStateEl = backendStatusEl.querySelector(".backend-state");
+      const refreshEl = document.getElementById("refresh");
       const dropEl = document.getElementById("drop");
       const urlEl = document.getElementById("url");
       const previewEl = document.getElementById("preview");
@@ -824,8 +850,12 @@ APP_HTML = r"""<!doctype html>
       const generateSampleEl = document.getElementById("generateSample");
       const florenceEnabledEl = document.getElementById("florenceEnabled");
       let isSelectingText = false;
+      const JOBS_POLL_MS = 2500;
+      const BACKEND_POLL_MS = 15000;
+      let jobsTimer = null;
+      let backendTimer = null;
 
-      document.getElementById("refresh").onclick = loadJobs;
+      refreshEl.onclick = refreshAll;
       generateSampleEl.addEventListener("change", async () => {
         try {
           await fetchJson("/api/settings", {
@@ -917,6 +947,48 @@ APP_HTML = r"""<!doctype html>
           generateSampleEl.checked = true;
           florenceEnabledEl.checked = false;
         }
+      }
+
+      async function refreshAll() {
+        refreshEl.disabled = true;
+        try {
+          await Promise.all([loadBackendHealth(), loadJobs()]);
+        } finally {
+          refreshEl.disabled = false;
+        }
+      }
+
+      async function loadBackendHealth(silent = false) {
+        if (!silent) {
+          setBackendStatus("checking", "接続中", "Forge / ComfyUI への接続を確認しています");
+        }
+        try {
+          const data = await fetchJson("/api/health");
+          const backendName = data.backend === "comfyui" ? "ComfyUI" : "Forge";
+          const key = data.backend === "comfyui" ? "comfyui" : "webui";
+          const info = data[key] || {};
+          if (info.ok) {
+            let detail = data.apiUrl || "";
+            if (data.backend !== "comfyui" && info.sd_model_checkpoint) {
+              detail = detail ? `${detail}\n${info.sd_model_checkpoint}` : info.sd_model_checkpoint;
+            }
+            setBackendStatus("connected", "接続済み", detail || `${backendName} に接続できました`);
+            backendStatusEl.querySelector(".backend-label").textContent = backendName;
+          } else {
+            setBackendStatus("disconnected", "未接続", info.error || `${backendName} に接続できません`);
+            backendStatusEl.querySelector(".backend-label").textContent = backendName;
+          }
+        } catch (error) {
+          setBackendStatus("disconnected", "未接続", error.message || "接続確認に失敗しました");
+          backendStatusEl.querySelector(".backend-label").textContent = "Backend";
+        }
+      }
+
+      function setBackendStatus(state, text, title) {
+        backendStatusEl.classList.remove("checking", "connected", "disconnected");
+        backendStatusEl.classList.add(state);
+        backendStateEl.textContent = text;
+        backendStatusEl.title = title || "";
       }
 
       async function loadJobs() {
@@ -1059,9 +1131,33 @@ APP_HTML = r"""<!doctype html>
         return escapeHtml(value).replace(/`/g, "&#96;");
       }
 
+      function startPolling() {
+        stopPolling();
+        jobsTimer = setInterval(loadJobs, JOBS_POLL_MS);
+        backendTimer = setInterval(() => loadBackendHealth(true), BACKEND_POLL_MS);
+      }
+
+      function stopPolling() {
+        if (jobsTimer) clearInterval(jobsTimer);
+        if (backendTimer) clearInterval(backendTimer);
+        jobsTimer = null;
+        backendTimer = null;
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          stopPolling();
+          return;
+        }
+        refreshAll();
+        startPolling();
+      });
+
       loadSettings();
-      loadJobs();
-      setInterval(loadJobs, 2500);
+      if (!document.hidden) {
+        refreshAll();
+        startPolling();
+      }
     </script>
   </body>
 </html>
@@ -1102,9 +1198,16 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/health":
                 settings = load_settings()
-                payload = {"ok": True, "bridge": "ready", "backend": settings.backend, "apiUrl": settings.api_url}
+                payload = {
+                    "ok": True,
+                    "bridge": "ready",
+                    "backend": settings.backend,
+                    "apiUrl": settings.api_url,
+                    "backendConnected": False,
+                }
                 try:
                     backend_info = check_backend(settings)
+                    payload["backendConnected"] = True
                     if settings.backend == "comfyui":
                         payload["comfyui"] = {"ok": True, "system": backend_info.get("system", {})}
                     else:
