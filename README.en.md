@@ -26,7 +26,7 @@ This tool does **not** use the source image as img2img input. Right-clicked imag
 ### v1.1
 
 - **Rating tags in generation prompts** — When WD14 returns a rating, one tag is prepended to the positive prompt for sample generation only (general→safe, sensitive→sensitive, questionable→nsfw, explicit→explicit). Not added to the tag list or translation. The **Rating:** line in the viewer is still WD14’s classification.
-- **View assembled generation prompt** — For jobs with sample generation, open **生成プロンプト（結合後）** in the viewer to see the exact positive sent to Forge / ComfyUI (collapsed by default, copy button). Open/closed state is preserved across job list refresh.
+- **View assembled generation prompt** — For jobs with sample generation, open **生成プロンプト（結合後）** in the viewer to see the exact positive sent to Forge / ComfyUI (collapsed by default, copy button).
 
 ### v1.0
 
