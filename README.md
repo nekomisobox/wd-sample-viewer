@@ -1,4 +1,5 @@
 # WD Tag Sample Viewer
+<img width="1919" height="840" alt="image" src="https://github.com/user-attachments/assets/109fd211-46e2-417f-8434-5d02cbde85a0" />
 
 画像や動画（HTML5 `<video>` の表示中フレーム）から WD14 タグを抽出し、そのタグを元にサンプル画像を自動生成し、**WD Tag Sample Viewer**（bridge / ビューア）に蓄積・表示するツールです。
 
