@@ -3,6 +3,12 @@
 backend=forge
 http://127.0.0.1:7860
 
+# WD Tag Sample Viewer（bridge）の待受アドレス
+bridge_host=127.0.0.1
+bridge_port=8777
+# まとめて指定する場合（指定時は bridge_host / bridge_port より優先）:
+# bridge_url=http://127.0.0.1:8777
+
 # ComfyUI 用（backend=comfyui のとき）
 # workflow=workflows/txt2img_sample.json
 # node_positive=CLIP Text Encode Positive
@@ -11,7 +17,7 @@ http://127.0.0.1:7860
 # node_empty_latent=Empty Latent Image
 
 # サンプル生成設定
-width=768
+width=1024
 height=1024
 steps=24
 cfg_scale=7
@@ -23,7 +29,7 @@ general_threshold=0.35
 character_threshold=0.85
 max_tags=80
 
-# Florence自然文キャプション（ON/OFF は WD Tag Sample Viewer の UI スイッチ）
+# Florence自然文キャプション（ON/OFF は WD Tag Sample Viewer の UI スイッチ → preferences.json）
 # 以下は固定プリセットです。通常は変更しないでください。
 florence_model=thwri/CogFlorence-2.2-Large
 florence_precision=bf16

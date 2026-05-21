@@ -1,6 +1,7 @@
+importScripts("bridge_config.js");
+
 const MENU_IMAGE = "wdtag-sample-image";
 const MENU_VIDEO = "wdtag-sample-video";
-const BRIDGE_BASE_URL = "http://127.0.0.1:8777";
 const JOBS_URL = `${BRIDGE_BASE_URL}/api/jobs`;
 
 let menuChain = Promise.resolve();

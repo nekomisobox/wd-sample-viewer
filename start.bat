@@ -53,7 +53,7 @@ if not exist ".venv\.installed" (
   echo ok> ".venv\.installed"
 )
 
-if not exist ".venv\.florence-installed" (
+if not exist ".venv\.florence-installed-v3" (
   echo Installing Florence dependencies...
   python -m pip install -r requirements-florence.txt
   if errorlevel 1 (
@@ -61,9 +61,10 @@ if not exist ".venv\.florence-installed" (
     pause
     exit /b 1
   )
-  echo ok> ".venv\.florence-installed"
+  echo ok> ".venv\.florence-installed-v3"
 )
 
-start "" "http://127.0.0.1:8777/"
+for /f "usebackq delims=" %%u in (`python -c "import os,sys; os.chdir(r'%CD%'); sys.path.insert(0,'bridge'); import server; print(server.sync_bridge_config())"`) do set "BRIDGE_URL=%%u"
+start "" "%BRIDGE_URL%/"
 python bridge\server.py
 pause

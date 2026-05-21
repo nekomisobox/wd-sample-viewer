@@ -1,10 +1,10 @@
 # WD Tag Sample Viewer
 
-画像や動画（HTML5 `<video>` の表示中フレーム）から WD14 タグを抽出し、そのタグを元にサンプル画像を自動生成し、**WD Tag Sample Viewer**（`http://127.0.0.1:8777/`）に蓄積・表示するツールです。
+画像や動画（HTML5 `<video>` の表示中フレーム）から WD14 タグを抽出し、そのタグを元にサンプル画像を自動生成し、**WD Tag Sample Viewer**（bridge / ビューア）に蓄積・表示するツールです。
 
 ## 概要
 
-Chrome の右クリックメニューから、対象の画像または動画の現在のフレームを取得し、ローカル **bridge**（`http://127.0.0.1:8777/`）経由で Forge / ComfyUI へ送信します。
+Chrome の右クリックメニューから、対象の画像または動画の現在のフレームを取得し、ローカル **bridge**（`config.txt` の `bridge_host` / `bridge_port`）経由で Forge / ComfyUI へ送信します。
 WD14 によるタグ抽出、Danbooru 辞書等を用いた日本語翻訳、およびサンプル画像の自動生成を行い、ビューア画面に蓄積・表示します。
 
 - **対応バックエンド**:
@@ -26,7 +26,12 @@ WD14 によるタグ抽出、Danbooru 辞書等を用いた日本語翻訳、お
 
 ```ini
 backend=forge          # forge または comfyui を指定
-http://127.0.0.1:7860  # APIのURL（1行目に記述しても可）
+http://127.0.0.1:7860  # 生成APIのURL（1行目に記述しても可）
+
+# bridge（WD Tag Sample Viewer）の待受（既定: 127.0.0.1:8777）
+bridge_host=127.0.0.1
+bridge_port=8777
+# bridge_url=http://127.0.0.1:8777  # まとめて指定する場合（host/port より優先）
 
 # --- ComfyUI 用の設定例 ---
 # workflow=workflows/txt2img_sample.json
@@ -38,10 +43,38 @@ http://127.0.0.1:7860  # APIのURL（1行目に記述しても可）
 
 ### ComfyUI を使用する場合の注意点
 
-- `workflows/txt2img_sample.json` を同梱しています。使用する環境に合わせて Checkpoint 名などを編集してください。
+> **ComfyUI 利用者へ（必読）**  
+> 同梱の `workflows/txt2img_sample.json` は**サンプル**です。**このままでは動きません。**  
+> 必ず次の **2 点** を自分の環境用に直してください。
+>
+> 1. **【必須】モデル（Checkpoint）指定** — `CheckpointLoaderSimple` の `ckpt_name` を、ComfyUI の `models/checkpoints/` にある**実ファイル名**に変更（例: `your_model.safetensors`）。初期値 `model.safetensors` のままは**失敗します**。  
+> 2. **【必須】API 形式のワークフロー** — 自作 workflow は ComfyUI で **Save (API Format)** で保存した JSON のみ使用可。通常のワークフロー保存形式は**そのままでは動きません**。
+>
+> 上記を直さないと、接続できていてもプロンプト投入時にエラーになります。
+
+- `config.txt` で `backend=comfyui` と ComfyUI の URL（例: `http://127.0.0.1:8188`）を指定してください。
+- **【必須】モデル指定 — 編集しないと動きません。** `workflows/txt2img_sample.json` の `CheckpointLoaderSimple` → `ckpt_name` を**必ず**自分の `.safetensors` 名に変更してください。
+- **【必須】API 形式 — これ以外は動きません。** 自作 workflow は **Save (API Format)** の JSON のみ。同梱 `txt2img_sample.json` は API 形式済みですが、**モデル名の変更は必須**です。
+- **seed（シード）:** 実行のたびに bridge が `KSampler` の seed を **ランダム値で上書き**します。JSON に `"seed": 0` と書いてあっても実行時は使われません（ジョブごとに別 seed）。`config.txt` に seed 項目はありません。
+- `config.txt` の `workflow` / `node_*` の行は、同梱ワークフローをそのまま使う限りコメントのままで構いません（コード側のデフォルトと一致しています）。別 JSON を使う場合やノードの `_meta.title` が違う場合だけ、コメントを外して上書きしてください。
 - ワークフローは **txt2img のみ**（Load Image / WD14 ノードは不要）で構成してください。WD14 や Florence の処理は bridge 内で実行されます。
 - 終端ノードは必ず **Preview Image** にしてください（ComfyUI の `output/` フォルダを圧迫しないため）。
 - bridge が `/view?type=temp` で取得し、`jobs/` フォルダ内に保存します。
+
+### `config.txt` のサンプル生成設定（width / steps など）
+
+`width` `height` `steps` `cfg_scale` `sampler_name` `batch_size` は **Forge / ReForge ではすべて反映**されます。
+
+**ComfyUI では一部のみ** bridge がワークフローに上書きします。
+
+| 設定 | Forge | ComfyUI |
+| --- | --- | --- |
+| `width` / `height` | 反映 | **反映**（`Empty Latent Image` ノード） |
+| `steps` / `cfg_scale` / `sampler_name` / `batch_size` | 反映 | **反映されない**（`workflows/txt2img_sample.json` 内の値を使用） |
+
+ComfyUI で steps やサンプラーなどを変えたい場合は、**ワークフロー JSON を直接編集**してください（同梱 JSON の `KSampler` / `Empty Latent Image` ノード）。
+
+`prompt_prefix` / `prompt_suffix` / `negative_prompt` は backend 共通でプロンプト組み立てに使われます。
 
 ## 翻訳
 
@@ -63,12 +96,15 @@ http://127.0.0.1:7860  # APIのURL（1行目に記述しても可）
 
 ## WD Tag Sample Viewer（ビューア）
 
-`http://127.0.0.1:8777/`（`start.bat` 起動中）
+`config.txt` の bridge アドレス（既定 `http://127.0.0.1:8777/`、`start.bat` 起動中）
+
+`bridge_host` / `bridge_port` を変更したら **start.bat を再起動**し、`chrome://extensions/` で拡張を **再読み込み**してください（`chrome_extension/src/bridge_config.js` が自動更新されます）。
 
 - 画像のドラッグ＆ドロップ、クリップボード貼り付け、画像 URL
 - ジョブ一覧・プロンプトコピー
-- **サンプル生成** ON/OFF（タグ抽出のみ / 生成あり）
-- **Florence自然文** ON/OFF（VRAM 節約のため OFF 可。初回 ON 時はモデル読込で遅くなります）
+- **サンプル生成** ON/OFF（タグ抽出のみ / 生成あり）— 変更は `preferences.json` に保存
+- **Florence自然文** ON/OFF（VRAM 節約のため OFF 可。初回 ON 時はモデル読込で遅くなります）— 同上
+- Florence は **transformers 4.41.2 以上 4.50 未満**、および **timm / einops** が必要です（`requirements-florence.txt` で自動インストール）。エラー時は `.venv\.florence-installed-v3` を削除して `start.bat` を再実行するか、`.venv\Scripts\python.exe -m pip install -r requirements-florence.txt` を実行してください。
 - **Backend 接続状態**（接続済み / 未接続 / 更新ボタン）
 
 ## Chrome 拡張機能の使い方
@@ -105,7 +141,7 @@ http://127.0.0.1:7860  # APIのURL（1行目に記述しても可）
 | 読み込み前・解像度不明 | 「動画の解像度を取得できませんでした」 |
 | 右クリック位置に video 要素がない | 「動画要素が見つかりませんでした」 |
 
-**対処法:** 取得に失敗した場合は、該当フレームをスクリーンショットするか、画像をコピーして **WD Tag Sample Viewer**（`http://127.0.0.1:8777/`）へ直接ドラッグ＆ドロップ（または貼り付け）してタグ抽出を行ってください。
+**対処法:** 取得に失敗した場合は、該当フレームをスクリーンショットするか、画像をコピーして **WD Tag Sample Viewer**（bridge の URL）へ直接ドラッグ＆ドロップ（または貼り付け）してタグ抽出を行ってください。
 
 ## License
 

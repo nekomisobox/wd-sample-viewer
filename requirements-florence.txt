@@ -1,3 +1,6 @@
 torch
-transformers>=4.41
+# Florence-2 (CogFlorence) は transformers 4.50+ で forced_bos_token_id 等の不整合が出るため上限を固定
+transformers>=4.41.2,<4.50
 accelerate>=0.30
+timm>=0.9.0
+einops>=0.6.0

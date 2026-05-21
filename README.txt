@@ -25,6 +25,20 @@ WD Tag Sample Viewer
    backend=comfyui
    http://127.0.0.1:8188
 
+   bridge（ビューア）の待受アドレス（既定 127.0.0.1:8777）:
+   bridge_host=127.0.0.1
+   bridge_port=8777
+   変更したら start.bat 再起動と chrome://extensions/ の再読み込みが必要です。
+
+   【重要】同梱 workflow はサンプルです。必ず以下を編集してください。
+   ・ckpt_name … 自分の checkpoint ファイル名（必須。これ無しでは動きません）
+   ・自作 workflow … Save (API Format) の JSON のみ使用可（通常保存は動きません）
+   ComfyUI 利用時は workflows/txt2img_sample.json の ckpt_name を
+   自分の checkpoints フォルダのモデル名に必ず変更してください。
+   自作 workflow は ComfyUI の Save (API Format) で保存した JSON を使うこと。
+   seed は JSON の値ではなく、実行ごとに bridge がランダムで上書きします。
+   config.txt の workflow / node_* は同梱 JSON のままならコメントのままで可。
+
 2. 生成バックエンドを起動してください。
 
    Forge の場合: --api 付きで起動
@@ -66,9 +80,8 @@ WD Tag Sample Viewer
 WD Tag Sample Viewer（ビューア）
 --------------------------------
 
-start.bat の起動中は、以下のページが使えます。
-
-http://127.0.0.1:8777/
+start.bat の起動中は、config.txt の bridge_host:bridge_port で開く
+ビューア（既定 http://127.0.0.1:8777/）が使えます。
 
 このページでは以下ができます。
 
@@ -91,8 +104,8 @@ http://127.0.0.1:8777/
 Florence自然文キャプション
 --------------------------
 
-WD Tag Sample Viewer（http://127.0.0.1:8777/）の **「Florence自然文」スイッチ** で ON/OFF します。
-config.txt ではありません。
+WD Tag Sample Viewer（bridge の URL）の **「Florence自然文」スイッチ** で ON/OFF します。
+変更は preferences.json に保存されます（config.txt ではありません）。
 
 - OFF: VRAM に Florence モデルを載せません
 - ON 後の初回ジョブ: モデル読込で遅くなります（2回目以降は速い）
@@ -117,23 +130,32 @@ http://127.0.0.1:7860/sdapi/v1/options
 config.txt の主な設定
 ---------------------
 
+bridge_host:
+bridge の待受ホスト（既定 127.0.0.1）
+
+bridge_port:
+bridge の待受ポート（既定 8777）
+
+bridge_url:
+bridge を URL でまとめて指定（指定時は bridge_host/port より優先）
+
 width:
-サンプル画像の横幅
+サンプル画像の横幅（ComfyUI でも反映）
 
 height:
-サンプル画像の高さ
+サンプル画像の高さ（ComfyUI でも反映）
 
 steps:
-生成ステップ
+生成ステップ（ComfyUI では workflow JSON 側。config だけ変えても効かない）
 
 cfg_scale:
-CFG Scale
+CFG Scale（ComfyUI では workflow JSON 側）
 
 sampler_name:
-サンプラー名
+サンプラー名（ComfyUI では workflow JSON 側）
 
 batch_size:
-生成枚数
+生成枚数（ComfyUI では workflow JSON 側）
 
 general_threshold:
 WD14の一般タグの採用しきい値
@@ -171,6 +193,10 @@ Python 3.10以降が必要です。
 生成結果はForge/ReForge側の現在設定の影響を受けます。
 初回起動時にWD14モデルをダウンロードします。
 Florenceを有効にすると初回セットアップがかなり重くなります。
+Florenceで forced_bos_token_id エラーは transformers が新しすぎます。
+timm / einops が無いエラーは requirements-florence.txt の未インストールです。
+.venv\.florence-installed-v3 を削除して start.bat を再実行するか、
+.venv\Scripts\python.exe -m pip install -r requirements-florence.txt を実行してください。
 動画フレームは HTML5 video のみ対応。CORS/DRM/iframe 等により
 取得できない場合があります（README.md の「動画フレームの取得」を参照）。
 jobs フォルダにジョブ履歴と生成画像が保存されます。

@@ -34,8 +34,9 @@ CONFIG_PATH = ROOT / "config.txt"
 PREFERENCES_PATH = ROOT / "preferences.json"
 MODELS_DIR = ROOT / "models" / "wd14"
 JOBS_DIR = ROOT / "jobs"
-HOST = "127.0.0.1"
-PORT = 8777
+BRIDGE_CONFIG_JS_PATH = ROOT / "chrome_extension" / "src" / "bridge_config.js"
+DEFAULT_BRIDGE_HOST = "127.0.0.1"
+DEFAULT_BRIDGE_PORT = 8777
 PREFERENCES_LOCK = threading.Lock()
 
 MODEL_REPO_URL = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main"
@@ -47,7 +48,7 @@ TAGS_FILE = "selected_tags.csv"
 class Settings:
     backend: str = "forge"
     api_url: str = ""
-    width: int = 768
+    width: int = 1024
     height: int = 1024
     steps: int = 24
     cfg_scale: float = 7.0
@@ -71,10 +72,16 @@ class Settings:
     node_negative: str = "CLIP Text Encode Negative"
     node_ksampler: str = "KSampler"
     node_empty_latent: str = "Empty Latent Image"
+    bridge_host: str = DEFAULT_BRIDGE_HOST
+    bridge_port: int = DEFAULT_BRIDGE_PORT
 
     @property
     def webui_url(self) -> str:
         return self.api_url
+
+    @property
+    def bridge_base_url(self) -> str:
+        return f"http://{self.bridge_host}:{self.bridge_port}".rstrip("/")
 
 
 class Tagger:
@@ -145,6 +152,49 @@ TAGGER = Tagger()
 JOB_LOCK = threading.Lock()
 
 
+def _transformers_version_tuple(version: str) -> tuple[int, int, int]:
+    parts: list[int] = []
+    for piece in version.split(".")[:3]:
+        digits = ""
+        for char in piece:
+            if char.isdigit():
+                digits += char
+            else:
+                break
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return parts[0], parts[1], parts[2]
+
+
+def assert_florence_transformers_compatible() -> None:
+    import transformers
+
+    major, minor, patch = _transformers_version_tuple(transformers.__version__)
+    if (major, minor, patch) >= (4, 50, 0):
+        raise RuntimeError(
+            f"transformers {transformers.__version__} は Florence と非互換です。"
+            ' ".venv\\Scripts\\python.exe" -m pip install "transformers>=4.41.2,<4.50" を実行し、'
+            " .venv\\.florence-installed-v3 が無い状態で start.bat を再実行してください。"
+        )
+
+
+def assert_florence_packages() -> None:
+    missing: list[str] = []
+    for name in ("timm", "einops"):
+        try:
+            __import__(name)
+        except ImportError:
+            missing.append(name)
+    if missing:
+        joined = ", ".join(missing)
+        raise RuntimeError(
+            f"Florence に必要なパッケージがありません: {joined}。"
+            " .venv\\.florence-installed-v3 を削除して start.bat を再実行するか、"
+            " .venv\\Scripts\\python.exe -m pip install -r requirements-florence.txt を実行してください。"
+        )
+
+
 class FlorenceCaptioner:
     def __init__(self) -> None:
         self.model_id = ""
@@ -161,6 +211,9 @@ class FlorenceCaptioner:
         try:
             import torch
             from transformers import AutoModelForCausalLM, AutoProcessor
+
+            assert_florence_transformers_compatible()
+            assert_florence_packages()
         except ImportError as exc:
             raise RuntimeError(
                 "Florence依存関係がありません。WD Tag Sample Viewer でFlorenceをONにしたあと、start.batを再起動してください。"
@@ -181,11 +234,21 @@ class FlorenceCaptioner:
             model_kwargs["attn_implementation"] = settings.florence_attention.strip()
 
         print(f"Loading Florence model: {settings.florence_model} ({self.device}, {precision})")
-        self.processor = AutoProcessor.from_pretrained(settings.florence_model, trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            settings.florence_model,
-            **model_kwargs,
-        ).to(self.device)
+        try:
+            self.processor = AutoProcessor.from_pretrained(settings.florence_model, trust_remote_code=True)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                settings.florence_model,
+                **model_kwargs,
+            ).to(self.device)
+        except Exception as exc:
+            message = str(exc)
+            if "timm" in message or "einops" in message:
+                raise RuntimeError(
+                    "Florence に timm / einops が必要です。"
+                    " .venv\\.florence-installed-v3 を削除して start.bat を再実行するか、"
+                    " pip install timm einops を実行してください。"
+                ) from exc
+            raise
         self.model_id = settings.florence_model
         self.load_key = load_key
 
@@ -537,6 +600,35 @@ def prepare_image(image: Image.Image, size: int) -> np.ndarray:
     return np.expand_dims(array, axis=0)
 
 
+def parse_bridge_endpoint(values: dict[str, str]) -> tuple[str, int]:
+    bridge_url = (values.get("bridge_url") or "").strip().rstrip("/")
+    if bridge_url:
+        if not bridge_url.lower().startswith(("http://", "https://")):
+            bridge_url = "http://" + bridge_url
+        parsed = urllib.parse.urlparse(bridge_url)
+        host = parsed.hostname or DEFAULT_BRIDGE_HOST
+        if not parsed.port:
+            port = 443 if parsed.scheme == "https" else 80
+        else:
+            port = parsed.port
+        return host, clamp(port, 1, 65535)
+
+    host = (values.get("bridge_host") or DEFAULT_BRIDGE_HOST).strip() or DEFAULT_BRIDGE_HOST
+    port = clamp(as_int(values.get("bridge_port"), DEFAULT_BRIDGE_PORT), 1, 65535)
+    return host, port
+
+
+def sync_bridge_config(settings: Settings | None = None) -> str:
+    settings = settings or load_settings()
+    BRIDGE_CONFIG_JS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        "// Auto-generated from config.txt on bridge start. Do not edit.\n"
+        f'const BRIDGE_BASE_URL = "{settings.bridge_base_url}";\n'
+    )
+    BRIDGE_CONFIG_JS_PATH.write_text(content, encoding="utf-8")
+    return settings.bridge_base_url
+
+
 def load_settings() -> Settings:
     if not CONFIG_PATH.exists():
         raise RuntimeError("config.txt が見つかりません")
@@ -564,10 +656,14 @@ def load_settings() -> Settings:
     if backend not in {"forge", "comfyui"}:
         raise RuntimeError("backend は forge または comfyui を指定してください")
 
+    bridge_host, bridge_port = parse_bridge_endpoint(values)
+
     return Settings(
         backend=backend,
         api_url=url.rstrip("/"),
-        width=as_int(values.get("width"), 768),
+        bridge_host=bridge_host,
+        bridge_port=bridge_port,
+        width=as_int(values.get("width"), 1024),
         height=as_int(values.get("height"), 1024),
         steps=as_int(values.get("steps"), 24),
         cfg_scale=as_float(values.get("cfg_scale"), 7.0),
@@ -1203,6 +1299,9 @@ class Handler(BaseHTTPRequestHandler):
                     "bridge": "ready",
                     "backend": settings.backend,
                     "apiUrl": settings.api_url,
+                    "bridgeUrl": settings.bridge_base_url,
+                    "bridgeHost": settings.bridge_host,
+                    "bridgePort": settings.bridge_port,
                     "backendConnected": False,
                 }
                 try:
@@ -1222,7 +1321,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/settings":
                 prefs = load_preferences()
-                json_response(self, 200, {"ok": True, **prefs})
+                settings = load_settings()
+                json_response(
+                    self,
+                    200,
+                    {
+                        "ok": True,
+                        **prefs,
+                        "bridgeUrl": settings.bridge_base_url,
+                        "bridgeHost": settings.bridge_host,
+                        "bridgePort": settings.bridge_port,
+                    },
+                )
                 return
             json_response(self, 404, {"ok": False, "error": "not found"})
         except Exception as exc:
@@ -1304,9 +1414,11 @@ def main() -> int:
     os.chdir(ROOT)
     print("WD Tag Sample Viewer")
     print(f"Folder: {ROOT}")
-    print(f"Bridge URL: http://{HOST}:{PORT}")
+    settings = Settings()
     try:
         settings = load_settings()
+        bridge_url = sync_bridge_config(settings)
+        print(f"Bridge URL: {bridge_url}")
         print(f"Backend: {settings.backend}")
         print(f"API URL: {settings.api_url}")
         try:
@@ -1327,8 +1439,10 @@ def main() -> int:
                 print("  ComfyUIが起動しているか、config.txtのURLを確認してください。")
     except Exception as exc:
         print(f"Config warning: {exc}")
+        bridge_url = sync_bridge_config(settings)
+        print(f"Bridge URL: {bridge_url} (defaults; fix config.txt)")
     print("Bridge ready. Keep this window open.")
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    server = ThreadingHTTPServer((settings.bridge_host, settings.bridge_port), Handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
