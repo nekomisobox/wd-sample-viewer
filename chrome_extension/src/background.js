@@ -61,7 +61,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await openInboxIfNeeded(result.job?.id || "");
     await notify(tab.id, frameId, {
       type: "WD_SAMPLE_DONE",
-      message: "Chrome取込に送りました"
+      message: "WD Tag Sample Viewer に送りました"
     });
   } catch (error) {
     await notify(tab.id, frameId, {

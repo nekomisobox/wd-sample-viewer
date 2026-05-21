@@ -163,7 +163,7 @@ class FlorenceCaptioner:
             from transformers import AutoModelForCausalLM, AutoProcessor
         except ImportError as exc:
             raise RuntimeError(
-                "Florence依存関係がありません。Chrome取込ページでFlorenceをONにしたあと、start.batを再起動してください。"
+                "Florence依存関係がありません。WD Tag Sample Viewer でFlorenceをONにしたあと、start.batを再起動してください。"
             ) from exc
 
         self.torch = torch
@@ -942,7 +942,7 @@ APP_HTML = r"""<!doctype html>
 
       function renderJobs(items) {
         if (!items.length) {
-          jobsEl.innerHTML = '<div class="empty">まだ取込はありません</div>';
+          jobsEl.innerHTML = '<div class="empty">まだジョブはありません</div>';
           return;
         }
         jobsEl.innerHTML = items.map(renderJob).join("");

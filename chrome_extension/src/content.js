@@ -63,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "WD_SAMPLE_DONE") {
     showPanel({
       state: "done",
-      message: message.message || "Chrome取込に送りました",
+      message: message.message || "WD Tag Sample Viewer に送りました",
       autoCloseMs: 1800
     });
   }
