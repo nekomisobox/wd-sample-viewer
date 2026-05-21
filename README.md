@@ -38,7 +38,6 @@ bridge_port=8777
 # node_positive=CLIP Text Encode Positive
 # node_negative=CLIP Text Encode Negative
 # node_ksampler=KSampler
-# node_empty_latent=Empty Latent Image
 ```
 
 ### ComfyUI を使用する場合の注意点
@@ -55,26 +54,26 @@ bridge_port=8777
 - `config.txt` で `backend=comfyui` と ComfyUI の URL（例: `http://127.0.0.1:8188`）を指定してください。
 - **【必須】モデル指定 — 編集しないと動きません。** `workflows/txt2img_sample.json` の `CheckpointLoaderSimple` → `ckpt_name` を**必ず**自分の `.safetensors` 名に変更してください。
 - **【必須】API 形式 — これ以外は動きません。** 自作 workflow は **Save (API Format)** の JSON のみ。同梱 `txt2img_sample.json` は API 形式済みですが、**モデル名の変更は必須**です。
-- **seed（シード）:** 実行のたびに bridge が `KSampler` の seed を **ランダム値で上書き**します。JSON に `"seed": 0` と書いてあっても実行時は使われません（ジョブごとに別 seed）。`config.txt` に seed 項目はありません。
+- **seed（シード）:** 実行のたびに bridge が `KSampler` の seed を **ランダム値で上書き**します（ワークフロー JSON の seed 値は使われません）。解像度・steps・sampler 等は workflow JSON のままです。
 - `config.txt` の `workflow` / `node_*` の行は、同梱ワークフローをそのまま使う限りコメントのままで構いません（コード側のデフォルトと一致しています）。別 JSON を使う場合やノードの `_meta.title` が違う場合だけ、コメントを外して上書きしてください。
 - ワークフローは **txt2img のみ**（Load Image / WD14 ノードは不要）で構成してください。WD14 や Florence の処理は bridge 内で実行されます。
 - 終端ノードは必ず **Preview Image** にしてください（ComfyUI の `output/` フォルダを圧迫しないため）。
 - bridge が `/view?type=temp` で取得し、`jobs/` フォルダ内に保存します。
 
-### `config.txt` のサンプル生成設定（width / steps など）
+### サンプル生成時に bridge が渡すもの
 
-`width` `height` `steps` `cfg_scale` `sampler_name` `batch_size` は **Forge / ReForge ではすべて反映**されます。
+bridge はタグから組み立てた **ポジティブ** と `config.txt` の **ネガティブ** だけを各 backend に渡します。解像度・steps・sampler・モデル等は **backend 側の普段の設定** に任せます。
 
-**ComfyUI では一部のみ** bridge がワークフローに上書きします。
-
-| 設定 | Forge | ComfyUI |
+| 項目 | Forge / ReForge | ComfyUI |
 | --- | --- | --- |
-| `width` / `height` | 反映 | **反映**（`Empty Latent Image` ノード） |
-| `steps` / `cfg_scale` / `sampler_name` / `batch_size` | 反映 | **反映されない**（`workflows/txt2img_sample.json` 内の値を使用） |
+| ポジティブ | txt2img API の `prompt` | workflow の正 CLIP ノード |
+| ネガティブ | API の `negative_prompt` | workflow の負 CLIP ノード |
+| seed | Forge UI の設定 | bridge が **毎回ランダム** で `KSampler` に注入 |
+| 解像度・steps・sampler・batch・モデル | **Forge の txt2img タブ** | **workflow JSON** |
 
-ComfyUI で steps やサンプラーなどを変えたい場合は、**ワークフロー JSON を直接編集**してください（同梱 JSON の `KSampler` / `Empty Latent Image` ノード）。
+`prompt_prefix` / `prompt_suffix` はポジ組み立て用（タグの前後に付与。Quality タグは通常 `prompt_suffix`）。ビューアのタグ一覧には表示されません。
 
-`prompt_prefix` / `prompt_suffix` / `negative_prompt` は backend 共通でプロンプト組み立てに使われます。
+旧 `config.txt` の `width` / `height` / `steps` 等は読み込まれません（残していても無視されます）。
 
 ## 翻訳
 
@@ -142,6 +141,21 @@ ComfyUI で steps やサンプラーなどを変えたい場合は、**ワーク
 | 右クリック位置に video 要素がない | 「動画要素が見つかりませんでした」 |
 
 **対処法:** 取得に失敗した場合は、該当フレームをスクリーンショットするか、画像をコピーして **WD Tag Sample Viewer**（bridge の URL）へ直接ドラッグ＆ドロップ（または貼り付け）してタグ抽出を行ってください。
+
+## トラブルシュート（初回 WD14 モデル `model.onnx` のダウンロード）
+
+初回のタグ抽出時、bridge が `models/wd14/model.onnx` を自動ダウンロードします。Windows で次のエラーが出ることがあります。
+
+`[WinError 32] プロセスはファイルにアクセスできません。別のプロセスが使用中です。`
+
+| 確認項目 | 対処 |
+| :--- | :--- |
+| `start.bat` を複数起動していないか | 開いている bridge コンソールをすべて閉じ、**1 つだけ**再起動 |
+| 別フォルダのコピーでも bridge が動いていないか | 検証用コピーだけ使う場合は、元フォルダ側の bridge を停止 |
+| `models/wd14/model.onnx` が既にあるか | サイズが十分（数十 MB）なら DL 不要。`model.onnx.tmp` だけ残っていれば削除してよい |
+| ダウンロードが途中で止まった | bridge を終了 → `model.onnx.tmp` を削除 → bridge を 1 つ起動 → 画像を 1 件送って再試行 |
+
+ウイルス対策ソフトがダウンロード直後にファイルをスキャンしている場合も、一時的に同様のエラーになることがあります。bridge はリトライしますが、解消しないときは上記を確認してください。
 
 ## License
 

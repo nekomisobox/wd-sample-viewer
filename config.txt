@@ -14,15 +14,10 @@ bridge_port=8777
 # node_positive=CLIP Text Encode Positive
 # node_negative=CLIP Text Encode Negative
 # node_ksampler=KSampler
-# node_empty_latent=Empty Latent Image
-
-# サンプル生成設定
-width=1024
-height=1024
-steps=24
-cfg_scale=7
-sampler_name=Euler a
-batch_size=1
+#
+# 解像度・steps・sampler 等は backend 側で設定:
+#   Forge/ReForge … txt2img タブの普段の設定
+#   ComfyUI … workflow JSON（Empty Latent Image / KSampler 等）
 
 # WD14のしきい値
 general_threshold=0.35
@@ -40,6 +35,6 @@ florence_num_beams=5
 florence_do_sample=false
 
 # 追加プロンプト/ネガティブ
-prompt_prefix=masterpiece, best quality
-prompt_suffix=
+prompt_prefix=
+prompt_suffix=masterpiece, best quality
 negative_prompt=lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, signature, watermark, username, blurry

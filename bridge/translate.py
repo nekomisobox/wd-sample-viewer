@@ -97,17 +97,20 @@ def translate_text_via_api(text: str, src: str = "en", dest: str = "ja") -> str:
     return _translate_google_unofficial(text, src=src, dest=dest)
 
 
-def translate_prompt(prompt: str, tags: list[str] | None = None) -> str:
+def translate_prompt(prompt: str, tags: list[str] | None = None, caption: str = "") -> str:
     prompt = (prompt or "").strip()
-    if not prompt:
-        return ""
-    tag_part, desc_part = split_prompt_parts(prompt)
-    if not tag_part:
-        tag_part = prompt
-        desc_part = ""
-    tag_tokens = parse_tag_list(tag_part)
-    if not tag_tokens and tags:
-        tag_tokens = [str(tag).strip() for tag in tags if str(tag).strip()]
+    caption = (caption or "").strip()
+    if prompt:
+        tag_part, desc_part = split_prompt_parts(prompt)
+        if not tag_part:
+            tag_part = prompt
+            desc_part = caption or desc_part
+        tag_tokens = parse_tag_list(tag_part)
+        if not tag_tokens and tags:
+            tag_tokens = [str(tag).strip() for tag in tags if str(tag).strip()]
+    else:
+        tag_tokens = [str(tag).strip() for tag in (tags or []) if str(tag).strip()]
+        desc_part = caption
     jp_map = load_tag_jp_map()
     translated_tags: list[str] = []
     unknown_indexes: list[int] = []

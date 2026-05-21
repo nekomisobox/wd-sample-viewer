@@ -38,6 +38,7 @@ BRIDGE_CONFIG_JS_PATH = ROOT / "chrome_extension" / "src" / "bridge_config.js"
 DEFAULT_BRIDGE_HOST = "127.0.0.1"
 DEFAULT_BRIDGE_PORT = 8777
 PREFERENCES_LOCK = threading.Lock()
+MODEL_LOCK = threading.RLock()
 
 MODEL_REPO_URL = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main"
 MODEL_FILE = "model.onnx"
@@ -48,12 +49,6 @@ TAGS_FILE = "selected_tags.csv"
 class Settings:
     backend: str = "forge"
     api_url: str = ""
-    width: int = 1024
-    height: int = 1024
-    steps: int = 24
-    cfg_scale: float = 7.0
-    sampler_name: str = "Euler a"
-    batch_size: int = 1
     general_threshold: float = 0.35
     character_threshold: float = 0.85
     max_tags: int = 80
@@ -64,14 +59,13 @@ class Settings:
     florence_max_new_tokens: int = 1024
     florence_num_beams: int = 5
     florence_do_sample: bool = False
-    prompt_prefix: str = "masterpiece, best quality"
-    prompt_suffix: str = ""
+    prompt_prefix: str = ""
+    prompt_suffix: str = "masterpiece, best quality"
     negative_prompt: str = ""
     workflow: str = "workflows/txt2img_sample.json"
     node_positive: str = "CLIP Text Encode Positive"
     node_negative: str = "CLIP Text Encode Negative"
     node_ksampler: str = "KSampler"
-    node_empty_latent: str = "Empty Latent Image"
     bridge_host: str = DEFAULT_BRIDGE_HOST
     bridge_port: int = DEFAULT_BRIDGE_PORT
 
@@ -92,18 +86,19 @@ class Tagger:
         self.tags: list[dict[str, Any]] = []
 
     def ensure_loaded(self) -> None:
-        ensure_model_files()
-        if self.session is None:
-            providers = ["CPUExecutionProvider"]
-            self.session = ort.InferenceSession(str(MODELS_DIR / MODEL_FILE), providers=providers)
-            input_meta = self.session.get_inputs()[0]
-            self.input_name = input_meta.name
-            shape = input_meta.shape
-            if len(shape) == 4 and isinstance(shape[1], int) and shape[1] > 0:
-                self.input_size = int(shape[1])
-            elif len(shape) == 4 and isinstance(shape[2], int) and shape[2] > 0:
-                self.input_size = int(shape[2])
-            self.tags = load_tags(MODELS_DIR / TAGS_FILE)
+        with MODEL_LOCK:
+            ensure_model_files()
+            if self.session is None:
+                providers = ["CPUExecutionProvider"]
+                self.session = ort.InferenceSession(str(MODELS_DIR / MODEL_FILE), providers=providers)
+                input_meta = self.session.get_inputs()[0]
+                self.input_name = input_meta.name
+                shape = input_meta.shape
+                if len(shape) == 4 and isinstance(shape[1], int) and shape[1] > 0:
+                    self.input_size = int(shape[1])
+                elif len(shape) == 4 and isinstance(shape[2], int) and shape[2] > 0:
+                    self.input_size = int(shape[2])
+                self.tags = load_tags(MODELS_DIR / TAGS_FILE)
 
     def interrogate(self, image_bytes: bytes, settings: Settings) -> dict[str, Any]:
         self.ensure_loaded()
@@ -297,14 +292,44 @@ FLORENCE = FlorenceCaptioner()
 
 
 def ensure_model_files() -> None:
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    for filename in (MODEL_FILE, TAGS_FILE):
-        path = MODELS_DIR / filename
-        if path.exists() and path.stat().st_size > 0:
-            continue
-        url = f"{MODEL_REPO_URL}/{filename}"
-        print(f"Downloading {filename}...")
-        download_file(url, path)
+    with MODEL_LOCK:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        for filename in (MODEL_FILE, TAGS_FILE):
+            path = MODELS_DIR / filename
+            if path.exists() and path.stat().st_size > 0:
+                continue
+            url = f"{MODEL_REPO_URL}/{filename}"
+            print(f"Downloading {filename}...")
+            download_file(url, path)
+
+
+def _is_file_lock_error(exc: BaseException) -> bool:
+    if isinstance(exc, PermissionError):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, "winerror", None) == 32:
+        return True
+    return False
+
+
+def atomic_replace(src: Path, dest: Path, *, attempts: int = 5, delay: float = 0.5) -> None:
+    last_exc: BaseException | None = None
+    for attempt in range(attempts):
+        try:
+            src.replace(dest)
+            return
+        except (PermissionError, OSError) as exc:
+            if not _is_file_lock_error(exc):
+                raise
+            last_exc = exc
+            if attempt + 1 < attempts:
+                time.sleep(delay)
+    model_dir = dest.parent
+    raise RuntimeError(
+        f"モデルファイルを {dest.name} に配置できませんでした（別プロセスがファイルを使用中です）。"
+        " bridge（start.bat）を二重起動していないか確認してください。"
+        f" 解決しない場合は bridge を終了し、{model_dir} の {dest.name}.tmp を削除してから"
+        " bridge を1つだけ再起動してください。"
+    ) from last_exc
 
 
 def download_file(url: str, path: Path) -> None:
@@ -326,7 +351,7 @@ def download_file(url: str, path: Path) -> None:
                     speed = done / 1024 / 1024 / elapsed
                     print(f"  {pct:5.1f}% {speed:4.1f} MB/s", end="\r")
     print()
-    tmp.replace(path)
+    atomic_replace(tmp, path)
 
 
 def safe_job_id() -> str:
@@ -502,8 +527,7 @@ def process_job(job_id: str) -> None:
         if resolve_florence_enabled() and not tags_only:
             update_job(job_id, message="Florence自然文を生成しています")
             caption = FLORENCE.caption(image_bytes, settings)
-        prompt = build_prompt(tag_result["tags"], caption, settings)
-        translated_prompt = translate_prompt(prompt, tag_result["tags"])
+        translated_prompt = translate_prompt("", tag_result["tags"], caption=caption)
         update_job(
             job_id,
             tags=tag_result["tags"],
@@ -511,7 +535,6 @@ def process_job(job_id: str) -> None:
             rating=tag_result["rating"],
             ratingScores=tag_result["ratingScores"],
             caption=caption,
-            prompt=prompt,
             translatedPrompt=translated_prompt,
             backend=settings.backend,
             apiUrl=settings.api_url,
@@ -519,6 +542,7 @@ def process_job(job_id: str) -> None:
         if tags_only:
             update_job(job_id, state="done", message="タグ抽出完了")
             return
+        generation_prompt = build_prompt(tag_result["tags"], caption, settings)
         if settings.backend == "comfyui":
             update_job(job_id, message="ComfyUIでサンプル生成中です")
             workflow_path = (ROOT / settings.workflow).resolve()
@@ -527,20 +551,17 @@ def process_job(job_id: str) -> None:
             images = generate_txt2img(
                 settings.api_url,
                 workflow_path,
-                positive=prompt,
+                positive=generation_prompt,
                 negative=settings.negative_prompt,
-                width=settings.width,
-                height=settings.height,
                 seed=None,
                 node_positive=settings.node_positive,
                 node_negative=settings.node_negative,
                 node_ksampler=settings.node_ksampler,
-                node_empty_latent=settings.node_empty_latent,
             )
             output_names = save_binary_outputs(job_id, images)
         else:
             update_job(job_id, message="txt2imgでサンプル生成中です")
-            generated = call_webui_txt2img(settings, prompt)
+            generated = call_webui_txt2img(settings, generation_prompt)
             output_names = save_base64_outputs(job_id, generated.get("images") or [])
         update_job(job_id, state="done", message="完了", outputs=output_names)
     except Exception as exc:
@@ -663,12 +684,6 @@ def load_settings() -> Settings:
         api_url=url.rstrip("/"),
         bridge_host=bridge_host,
         bridge_port=bridge_port,
-        width=as_int(values.get("width"), 1024),
-        height=as_int(values.get("height"), 1024),
-        steps=as_int(values.get("steps"), 24),
-        cfg_scale=as_float(values.get("cfg_scale"), 7.0),
-        sampler_name=values.get("sampler_name") or "Euler a",
-        batch_size=clamp(as_int(values.get("batch_size"), 1), 1, 4),
         general_threshold=as_float(values.get("general_threshold"), 0.35),
         character_threshold=as_float(values.get("character_threshold"), 0.85),
         max_tags=clamp(as_int(values.get("max_tags"), 80), 1, 200),
@@ -686,7 +701,6 @@ def load_settings() -> Settings:
         node_positive=values.get("node_positive") or "CLIP Text Encode Positive",
         node_negative=values.get("node_negative") or "CLIP Text Encode Negative",
         node_ksampler=values.get("node_ksampler") or "KSampler",
-        node_empty_latent=values.get("node_empty_latent") or "Empty Latent Image",
     )
 
 
@@ -742,12 +756,6 @@ def call_webui_txt2img(settings: Settings, prompt: str) -> dict[str, Any]:
     payload = {
         "prompt": prompt,
         "negative_prompt": settings.negative_prompt,
-        "width": settings.width,
-        "height": settings.height,
-        "steps": settings.steps,
-        "cfg_scale": settings.cfg_scale,
-        "sampler_name": settings.sampler_name,
-        "batch_size": settings.batch_size,
         "n_iter": 1,
         "save_images": False,
         "send_images": True,
@@ -1159,22 +1167,16 @@ APP_HTML = r"""<!doctype html>
 
       function renderJob(job) {
         const state = escapeHtml(job.state || "unknown");
-        const tagsOnly = !!job.tagsOnly;
         const tags = (job.tags || []).join(", ");
-        const prompt = job.prompt || job.message || "";
         const translated = job.translatedPrompt || "";
-        const copyText = tagsOnly ? tags : prompt;
-        const copyLabel = tagsOnly ? "タグをコピー" : "プロンプトをコピー";
+        const tagMeta = job.rating
+          ? `Rating: ${escapeHtml(job.rating)}`
+          : (job.tagsOnly ? "タグのみモード" : "");
         const outputs = (job.outputs || []).map((src) => `<img src="${escapeHtml(src)}" alt="output" data-preview="1">`).join("");
         const input = job.input ? `<img src="${escapeHtml(job.input)}" alt="input" data-preview="1">` : "";
-        const mainContent = tagsOnly
-          ? `
-              <div class="tag-meta">${job.rating ? `Rating: ${escapeHtml(job.rating)}` : "タグのみモード"}</div>
+        const mainContent = `
+              ${tagMeta ? `<div class="tag-meta">${tagMeta}</div>` : ""}
               <div class="tags-only">${escapeHtml(tags || job.message || "タグ抽出中...")}</div>
-              ${translated ? `<div class="prompt translated">${escapeHtml(translated)}</div>` : ""}
-            `
-          : `
-              <div class="prompt">${escapeHtml(prompt)}</div>
               ${translated ? `<div class="prompt translated">${escapeHtml(translated)}</div>` : ""}
             `;
         const translationCopy = translated
@@ -1194,7 +1196,7 @@ APP_HTML = r"""<!doctype html>
               </div>
               <div>
                 <div class="actions">
-                  <button data-copy="${escapeAttr(copyText)}" type="button">${copyLabel}</button>
+                  <button data-copy="${escapeAttr(tags)}" type="button">タグをコピー</button>
                   ${translationCopy}
                 </div>
                 ${mainContent}

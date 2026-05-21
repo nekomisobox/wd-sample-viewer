@@ -21,7 +21,7 @@
   },
   "3": {
     "inputs": {
-      "text": "masterpiece, best quality",
+      "text": "",
       "clip": ["1", 1]
     },
     "class_type": "CLIPTextEncode",

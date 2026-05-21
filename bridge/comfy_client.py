@@ -37,32 +37,24 @@ def patch_txt2img_workflow(
     *,
     positive: str,
     negative: str,
-    width: int,
-    height: int,
     seed: int | None,
     node_positive: str,
     node_negative: str,
     node_ksampler: str,
-    node_empty_latent: str,
 ) -> dict[str, Any]:
     wf = copy.deepcopy(workflow)
     pos_nodes = find_nodes_by_title(wf, node_positive)
     neg_nodes = find_nodes_by_title(wf, node_negative)
     sampler_nodes = find_nodes_by_title(wf, node_ksampler)
-    latent_nodes = find_nodes_by_title(wf, node_empty_latent)
     if not pos_nodes:
         raise RuntimeError(f"positive node not found: {node_positive}")
     if not neg_nodes:
         raise RuntimeError(f"negative node not found: {node_negative}")
     if not sampler_nodes:
         raise RuntimeError(f"sampler node not found: {node_ksampler}")
-    if not latent_nodes:
-        raise RuntimeError(f"latent node not found: {node_empty_latent}")
     pos_nodes[0][1].setdefault("inputs", {})["text"] = positive
     neg_nodes[0][1].setdefault("inputs", {})["text"] = negative
     sampler_nodes[0][1].setdefault("inputs", {})["seed"] = seed if seed is not None else random.randint(0, 2**32 - 1)
-    latent_nodes[0][1].setdefault("inputs", {})["width"] = int(width)
-    latent_nodes[0][1].setdefault("inputs", {})["height"] = int(height)
     return wf
 
 
@@ -147,26 +139,20 @@ def generate_txt2img(
     *,
     positive: str,
     negative: str,
-    width: int,
-    height: int,
     seed: int | None,
     node_positive: str,
     node_negative: str,
     node_ksampler: str,
-    node_empty_latent: str,
     timeout: int = 900,
 ) -> list[bytes]:
     workflow = patch_txt2img_workflow(
         load_workflow(workflow_path),
         positive=positive,
         negative=negative,
-        width=width,
-        height=height,
         seed=seed,
         node_positive=node_positive,
         node_negative=node_negative,
         node_ksampler=node_ksampler,
-        node_empty_latent=node_empty_latent,
     )
     prompt_id = queue_prompt(comfy_url, workflow)
     history = wait_for_outputs(comfy_url, prompt_id, timeout=timeout)

@@ -139,24 +139,6 @@ bridge の待受ポート（既定 8777）
 bridge_url:
 bridge を URL でまとめて指定（指定時は bridge_host/port より優先）
 
-width:
-サンプル画像の横幅（ComfyUI でも反映）
-
-height:
-サンプル画像の高さ（ComfyUI でも反映）
-
-steps:
-生成ステップ（ComfyUI では workflow JSON 側。config だけ変えても効かない）
-
-cfg_scale:
-CFG Scale（ComfyUI では workflow JSON 側）
-
-sampler_name:
-サンプラー名（ComfyUI では workflow JSON 側）
-
-batch_size:
-生成枚数（ComfyUI では workflow JSON 側）
-
 general_threshold:
 WD14の一般タグの採用しきい値
 
@@ -176,13 +158,17 @@ florence_max_new_tokens:
 Florenceの最大生成トークン数。通常は変更しない
 
 prompt_prefix:
-タグの前に足すプロンプト
+サンプル生成時のみ先頭に付与。タグ一覧には表示されない
 
 prompt_suffix:
-タグの後に足すプロンプト
+サンプル生成時のみ末尾に付与（masterpiece, best quality 等）。タグ一覧には表示されない
 
 negative_prompt:
-ネガティブプロンプト
+ネガティブプロンプト（Forge は API 送信、ComfyUI は workflow の負 CLIP に注入）
+
+サンプル生成の解像度・steps・sampler・モデル等:
+Forge/ReForge は txt2img タブの普段の設定。ComfyUI は workflow JSON。
+bridge はポジ・ネガ（と ComfyUI の seed のみ）を渡します。旧 width/steps 等の config 行は無視されます。
 
 
 注意
