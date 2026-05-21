@@ -21,6 +21,17 @@ WD14 によるタグ抽出、Danbooru 辞書等を用いた日本語翻訳、お
 
 ※本ツールは「元画像を img2img の入力にするツール」ではありません。右クリックした画像・動画は**タグ抽出のためだけ**に使用されます。
 
+## 更新履歴
+
+### v1.1
+
+- **WD14 Rating の生成プロンプトへの反映** — サンプル生成時のみ、Rating に応じてポジティブ先頭に1タグを自動付与（general→safe、sensitive→sensitive、questionable→nsfw、explicit→explicit）。ビューアのタグ一覧・翻訳には含めません。`Rating: questionable` 等の表示は従来どおり WD14 の判定結果です。
+- **生成プロンプト（結合後）の確認** — サンプル生成したジョブで、Forge / ComfyUI に送った結合済みポジティブをビューアから確認できます。既定は折りたたみ（「生成プロンプト（結合後）」を開く）。コピー可。ジョブ一覧の自動更新後も、開閉状態を維持します。
+
+### v1.0
+
+初回公開。
+
 ## セットアップ手順
 
 初めてお使いになる方は、同梱の [README.txt](README.txt) に記載されているセットアップ手順をご参照ください。
@@ -76,6 +87,8 @@ bridge はタグから組み立てた **ポジティブ** と `config.txt` の *
 
 `prompt_prefix` / `prompt_suffix` はポジ組み立て用（タグの前後に付与。Quality タグは通常 `prompt_suffix`）。ビューアのタグ一覧には表示されません。
 
+WD14 の Rating があるときだけ、サンプル生成プロンプトの**先頭**に1タグを足します（general→safe、sensitive→sensitive、questionable→nsfw、explicit→explicit）。タグ一覧・翻訳には含めません。
+
 ## 翻訳
 
 - 辞書: `data/danbooru_translations_jp.csv`
@@ -101,7 +114,8 @@ bridge はタグから組み立てた **ポジティブ** と `config.txt` の *
 `bridge_host` / `bridge_port` を変更したら **start.bat を再起動**し、`chrome://extensions/` で拡張を **再読み込み**してください（`chrome_extension/src/bridge_config.js` が自動更新されます）。
 
 - 画像のドラッグ＆ドロップ、クリップボード貼り付け、画像 URL
-- ジョブ一覧・プロンプトコピー
+- ジョブ一覧・タグコピー・翻訳コピー
+- **生成プロンプト（結合後）** — サンプル生成時に backend へ送った文字列（Rating 注入・`prompt_suffix`・タグ・Florence 等を `, ` で結合したもの）。折りたたみ表示・コピー可（v1.1）
 - **サンプル生成** ON/OFF（タグ抽出のみ / 生成あり）— 変更は `preferences.json` に保存
 - **Florence自然文** ON/OFF（VRAM 節約のため OFF 可。初回 ON 時はモデル読込で遅くなります）— 同上
 - Florence は **transformers 4.41.2 以上 4.50 未満**、および **timm / einops** が必要です（`requirements-florence.txt` で自動インストール）。エラー時は `.venv\.florence-installed-v3` を削除して `start.bat` を再実行するか、`.venv\Scripts\python.exe -m pip install -r requirements-florence.txt` を実行してください。

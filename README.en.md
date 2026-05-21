@@ -21,6 +21,17 @@ From Chrome’s context menu, capture the target image or the current video fram
 
 This tool does **not** use the source image as img2img input. Right-clicked images/video are used **only for tag extraction**.
 
+## Changelog
+
+### v1.1
+
+- **Rating tags in generation prompts** — When WD14 returns a rating, one tag is prepended to the positive prompt for sample generation only (general→safe, sensitive→sensitive, questionable→nsfw, explicit→explicit). Not added to the tag list or translation. The **Rating:** line in the viewer is still WD14’s classification.
+- **View assembled generation prompt** — For jobs with sample generation, open **生成プロンプト（結合後）** in the viewer to see the exact positive sent to Forge / ComfyUI (collapsed by default, copy button). Open/closed state is preserved across job list refresh.
+
+### v1.0
+
+Initial public release.
+
 ## Setup
 
 First-time setup: see [README.txt](README.txt) (Japanese). Main steps: edit `config.txt`, start Forge/ComfyUI with API enabled, run `start.bat`, load the Chrome extension.
@@ -77,6 +88,8 @@ The bridge sends only the assembled **positive** prompt and **negative** prompt 
 
 `prompt_prefix` / `prompt_suffix` wrap tags when building the positive prompt (quality tags are usually in `prompt_suffix`). They are not shown in the viewer tag list.
 
+When WD14 returns a rating, one tag is prepended for sample generation only: general→safe, sensitive→sensitive, questionable→nsfw, explicit→explicit. Not added to the tag list or translation.
+
 ## Translation
 
 - Dictionary: `data/danbooru_translations_jp.csv`
@@ -101,6 +114,7 @@ After changing `bridge_host` / `bridge_port`, **restart `start.bat`** and **relo
 
 - Drag-and-drop, clipboard paste, image URL
 - Job list, tag copy, translation copy
+- **生成プロンプト（結合後）** — Collapsible assembled positive sent to the backend (v1.1; UI label is Japanese)
 - **Sample generation** on/off (stored in `preferences.json`)
 - **Florence caption** on/off (stored in `preferences.json`; first enable loads the model)
 - Florence needs **transformers >= 4.41.2, < 4.50** and **timm / einops** (`requirements-florence.txt`). On errors, delete `.venv\.florence-installed-v3` and rerun `start.bat`, or `pip install -r requirements-florence.txt`.

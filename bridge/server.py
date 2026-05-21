@@ -423,6 +423,7 @@ def public_job(job: dict[str, Any]) -> dict[str, Any]:
         "createdAt": job.get("createdAt") or 0,
         "updatedAt": job.get("updatedAt") or 0,
         "prompt": job.get("prompt") or "",
+        "generationPrompt": job.get("generationPrompt") or "",
         "translatedPrompt": job.get("translatedPrompt") or "",
         "caption": job.get("caption") or "",
         "tags": job.get("tags") or [],
@@ -542,7 +543,13 @@ def process_job(job_id: str) -> None:
         if tags_only:
             update_job(job_id, state="done", message="タグ抽出完了")
             return
-        generation_prompt = build_prompt(tag_result["tags"], caption, settings)
+        generation_prompt = build_prompt(
+            tag_result["tags"],
+            caption,
+            settings,
+            rating=str(tag_result.get("rating") or ""),
+        )
+        update_job(job_id, generationPrompt=generation_prompt)
         if settings.backend == "comfyui":
             update_job(job_id, message="ComfyUIでサンプル生成中です")
             workflow_path = (ROOT / settings.workflow).resolve()
@@ -740,8 +747,24 @@ def normalize_florence_task(value: str) -> str:
     return f"<{task.upper()}>"
 
 
-def build_prompt(tags: list[str], caption: str, settings: Settings) -> str:
+RATING_PROMPT_TAG = {
+    "general": "safe",
+    "sensitive": "sensitive",
+    "questionable": "nsfw",
+    "explicit": "explicit",
+}
+
+
+def rating_prompt_tag(rating: str) -> str:
+    key = str(rating or "").strip().lower()
+    return RATING_PROMPT_TAG.get(key, "")
+
+
+def build_prompt(tags: list[str], caption: str, settings: Settings, *, rating: str = "") -> str:
     parts = []
+    injected = rating_prompt_tag(rating)
+    if injected:
+        parts.append(injected)
     if settings.prompt_prefix.strip():
         parts.append(settings.prompt_prefix.strip())
     parts.extend(tags)
@@ -888,6 +911,11 @@ APP_HTML = r"""<!doctype html>
       .open-folder { font-size: 11px; justify-self: start; padding: 3px 8px; }
       .prompt { background: #0f1318; border: 1px solid #3a4656; border-radius: 6px; color: #f2f6fb; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; min-height: 120px; overflow: auto; padding: 10px; white-space: pre-wrap; word-break: break-word; }
       .prompt.translated { background: #12161b; color: #d8dee9; min-height: 80px; margin-top: 8px; }
+      .generation-details { margin-top: 8px; }
+      .generation-details summary { color: #9db3ca; cursor: pointer; font-size: 12px; list-style-position: outside; }
+      .generation-details[open] summary { margin-bottom: 6px; }
+      .prompt.generation { color: #c8e6ff; margin-top: 6px; min-height: 48px; }
+      .generation-details .copy-row { display: flex; justify-content: flex-end; margin-top: 6px; }
       .tags-only { background: #0f1318; border: 1px solid #3a4656; border-radius: 6px; color: #d7e8ff; font-size: 13px; line-height: 1.55; min-height: 80px; overflow: auto; padding: 10px; white-space: pre-wrap; word-break: break-word; }
       .tag-meta { color: #9db3ca; font-size: 12px; margin-bottom: 6px; }
       .actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -954,6 +982,7 @@ APP_HTML = r"""<!doctype html>
       const generateSampleEl = document.getElementById("generateSample");
       const florenceEnabledEl = document.getElementById("florenceEnabled");
       let isSelectingText = false;
+      const openGenerationDetails = new Set();
       const JOBS_POLL_MS = 2500;
       const BACKEND_POLL_MS = 15000;
       let jobsTimer = null;
@@ -1021,8 +1050,37 @@ APP_HTML = r"""<!doctype html>
         const selection = window.getSelection();
         const anchor = selection && selection.anchorNode;
         const node = anchor && (anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor);
-        isSelectingText = !!selection && !selection.isCollapsed && !!node?.closest?.(".prompt, .tags-only, .translated");
+        isSelectingText = !!selection && !selection.isCollapsed && !!node?.closest?.(".prompt, .tags-only, .translated, .generation-details");
       });
+      jobsEl.addEventListener("toggle", (event) => {
+        const details = event.target;
+        if (!(details instanceof HTMLDetailsElement) || !details.classList.contains("generation-details")) {
+          return;
+        }
+        const jobId = details.closest(".job")?.id;
+        if (!jobId) return;
+        if (details.open) openGenerationDetails.add(jobId);
+        else openGenerationDetails.delete(jobId);
+      });
+
+      function syncOpenGenerationDetailsFromDom() {
+        for (const article of jobsEl.querySelectorAll("article.job")) {
+          const jobId = article.id;
+          const details = article.querySelector(".generation-details");
+          if (!details) continue;
+          if (details.open) openGenerationDetails.add(jobId);
+          else openGenerationDetails.delete(jobId);
+        }
+      }
+
+      function restoreOpenGenerationDetails() {
+        for (const details of jobsEl.querySelectorAll(".generation-details")) {
+          const jobId = details.closest(".job")?.id;
+          if (jobId && openGenerationDetails.has(jobId)) {
+            details.open = true;
+          }
+        }
+      }
 
       async function submitFile(file) {
         const form = new FormData();
@@ -1118,10 +1176,13 @@ APP_HTML = r"""<!doctype html>
 
       function renderJobs(items) {
         if (!items.length) {
+          openGenerationDetails.clear();
           jobsEl.innerHTML = '<div class="empty">まだジョブはありません</div>';
           return;
         }
+        syncOpenGenerationDetailsFromDom();
         jobsEl.innerHTML = items.map(renderJob).join("");
+        restoreOpenGenerationDetails();
         for (const button of jobsEl.querySelectorAll("[data-copy]")) {
           button.onclick = async () => {
             await navigator.clipboard.writeText(button.dataset.copy || "");
@@ -1168,6 +1229,7 @@ APP_HTML = r"""<!doctype html>
       function renderJob(job) {
         const state = escapeHtml(job.state || "unknown");
         const tags = (job.tags || []).join(", ");
+        const generationPrompt = job.generationPrompt || "";
         const translated = job.translatedPrompt || "";
         const tagMeta = job.rating
           ? `Rating: ${escapeHtml(job.rating)}`
@@ -1177,6 +1239,7 @@ APP_HTML = r"""<!doctype html>
         const mainContent = `
               ${tagMeta ? `<div class="tag-meta">${tagMeta}</div>` : ""}
               <div class="tags-only">${escapeHtml(tags || job.message || "タグ抽出中...")}</div>
+              ${generationPrompt ? `<details class="generation-details"><summary>生成プロンプト（結合後）</summary><div class="prompt generation">${escapeHtml(generationPrompt)}</div><div class="copy-row"><button data-copy="${escapeAttr(generationPrompt)}" type="button">コピー</button></div></details>` : ""}
               ${translated ? `<div class="prompt translated">${escapeHtml(translated)}</div>` : ""}
             `;
         const translationCopy = translated
